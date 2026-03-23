@@ -23,9 +23,9 @@ You give the team a task. The Boss agent on Floor 3 (Penthouse) plans it, delega
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ ⬡ SWIK HQ  ● LIVE  5 AGENTS  1 RUNNING              12:34:56  ─  □  ✕  │
+│ ⬡ SWIK HQ  ● LIVE  5 AGENTS  1 RUNNING                12:34:56  ─  □  ✕  │
 ├──────────────────────────────────────────────────────────────────────────┤
-│ ⬡ OLLAMA — llama3.2, mistral                                            │
+│ ⬡ OLLAMA — llama3.2, mistral                                             │
 ├──────────┬──────────────────────────────────────────┬────────────────────┤
 │ FLOOR 3  │                                          │ 💬 CHAT            │
 │ Penthouse│  ┌──────────────────────────────────┐    │                    │
@@ -33,12 +33,12 @@ You give the team a task. The Boss agent on Floor 3 (Penthouse) plans it, delega
 │          │  │                                  │    │ between agents in  │
 │ FLOOR 2  │  │  Floor 3 ── Rex (Boss) 💭thinking│    │ real time          │
 │ Mid      │  │  Floor 2 ── Pixel · Scout        │    ├────────────────────┤
-│ ● Pixel  │  │  Floor 1 ── Nova  · Axel ⚙working│   │ ⚡ TASKS           │
+│ ● Pixel  │  │  Floor 1 ── Nova  · Axel ⚙working│    │    ⚡ TASKS         │
 │ ● Scout  │  │                                  │    │                    │
 │          │  │  Drag to orbit · Scroll to zoom  │    │ Task cards with    │
 │ FLOOR 1  │  └──────────────────────────────────┘    │ live results       │
 │ Ground   │                                          ├────────────────────┤
-│ ● Nova   │  Rex  ·  Floor 3  ·  llama3.2           │ 📁 FILES           │
+│ ● Nova   │  Rex  ·  Floor 3  ·  llama3.2            │     📁 FILES       │
 │ ● Axel   │  planning  delegation  leadership        │                    │
 │          │  [planning][delegation][synthesis]       │ Browse workspace   │
 │ + ADD    │                          ✎ EDIT          │ files per agent    │
