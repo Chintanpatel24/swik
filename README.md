@@ -1,30 +1,48 @@
-# ⬡ AgentOffice
+<div align="center">
 
-A visual multi-agent AI office that runs as a **desktop app on Linux**. Inspired by The Delegation — using the same `office.glb` + `character.glb` 3D assets, OrbitControls camera, and React screen-space overlay architecture.
+# ⬡ SWIK
+### AI Agent Headquarters
 
-**100% local. No cloud. No accounts. No API keys required** (using Ollama).
+**A visual multi-agent AI office that runs on your desktop, from a USB drive, or as a web app.**
+Built for developers who want a permanent AI team working alongside them — local, private, and free.
+
+[![GitHub](https://img.shields.io/badge/GitHub-Chintanpatel24%2Fswik-blue?style=flat-square&logo=github)](https://github.com/Chintanpatel24/swik)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](./LICENSE)
+[![Node](https://img.shields.io/badge/Node.js-18+-brightgreen?style=flat-square&logo=node.js)](https://nodejs.org)
+[![Three.js](https://img.shields.io/badge/Three.js-r163-black?style=flat-square&logo=threedotjs)](https://threejs.org)
+
+</div>
 
 ---
 
-## What it looks like
+## What is SWIK?
+
+SWIK is an AI agent headquarters where each agent has a **physical presence** in a 3D building. Agents live on different floors, animate when they're thinking or working, and show status bubbles above their heads in real time.
+
+You give the team a task. The Boss agent on Floor 3 (Penthouse) plans it, delegates subtasks to workers on Floors 1 and 2, each agent works with tools (web search, file I/O), and the Boss synthesises a final result — all visible as live activity in the 3D office.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ ⬡ AGENTOFFICE          Rex · Nova · Pixel · Scout · Quill    12:34:56  │
-├───────────┬────────────────────────────────────────┬────────────────────┤
-│  TEAM     │                                        │  💬  ⚡  📁        │
-│           │   [3D Office Room — three.js]          │                    │
-│  BOSS     │                                        │  Message bubbles,  │
-│  ● Rex    │   Agents sit at desks as 3D characters │  task dispatch,    │
-│           │   and animate (sit_work, talk, happy)  │  workspace files   │
-│  DEV      │                                        │                    │
-│  ● Nova ✎ │   Name/status bubbles float above      │                    │
-│           │   each agent's head in screen-space    │                    │
-│  DESIGN   │                                        │                    │
-│  ● Pixel✎ │   Connection lines between talking     │                    │
-│           │   agents                               │                    │
-│ + ADD     │   Drag to orbit · Scroll to zoom       │                    │
-└───────────┴────────────────────────────────────────┴────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ⬡ SWIK HQ  ● LIVE  5 AGENTS  1 RUNNING              12:34:56  ─  □  ✕  │
+├──────────────────────────────────────────────────────────────────────────┤
+│ ⬡ OLLAMA — llama3.2, mistral                                            │
+├──────────┬──────────────────────────────────────────┬────────────────────┤
+│ FLOOR 3  │                                          │ 💬 CHAT            │
+│ Penthouse│  ┌──────────────────────────────────┐    │                    │
+│ ● Rex    │  │  3D Building — Three.js WebGL    │    │ Messages stream    │
+│          │  │                                  │    │ between agents in  │
+│ FLOOR 2  │  │  Floor 3 ── Rex (Boss) 💭thinking│    │ real time          │
+│ Mid      │  │  Floor 2 ── Pixel · Scout        │    ├────────────────────┤
+│ ● Pixel  │  │  Floor 1 ── Nova  · Axel ⚙working│   │ ⚡ TASKS           │
+│ ● Scout  │  │                                  │    │                    │
+│          │  │  Drag to orbit · Scroll to zoom  │    │ Task cards with    │
+│ FLOOR 1  │  └──────────────────────────────────┘    │ live results       │
+│ Ground   │                                          ├────────────────────┤
+│ ● Nova   │  Rex  ·  Floor 3  ·  llama3.2           │ 📁 FILES           │
+│ ● Axel   │  planning  delegation  leadership        │                    │
+│          │  [planning][delegation][synthesis]       │ Browse workspace   │
+│ + ADD    │                          ✎ EDIT          │ files per agent    │
+└──────────┴──────────────────────────────────────────┴────────────────────┘
 ```
 
 ---
@@ -33,147 +51,245 @@ A visual multi-agent AI office that runs as a **desktop app on Linux**. Inspired
 
 | Feature | Detail |
 |---------|--------|
-| **3D office** | Real `office.glb` + animated `character.glb` via Three.js |
-| **OrbitControls** | Drag to orbit, scroll to zoom, camera follows selected agent |
-| **React overlay** | Screen-projected name/status bubbles above each character |
-| **Agent animations** | `Sit_Idle`, `Sit_Work`, `Talk`, `Happy` based on live status |
-| **5 default agents** | Rex (boss), Nova (dev), Pixel (designer), Scout (researcher), Quill (writer) |
-| **Custom agents** | Create unlimited agents with any name, role, color, model |
-| **Multi-AI support** | Ollama, LM Studio, Groq, OpenAI, any OpenAI-compatible API |
-| **Boss orchestration** | Boss breaks down tasks → delegates to team → synthesises results |
+| **3D HQ Building** | Real `office.glb` + animated `character.glb` rendered with Three.js WebGL |
+| **Multi-floor layout** | Floor 1 (Dev/Research), Floor 2 (Design/Strategy), Floor 3 (Boss/Penthouse) |
+| **Live animations** | Characters animate `Sit_Work`, `Talk`, `Happy` etc. based on real agent status |
+| **Screen-space bubbles** | React name/status labels projected from 3D world → screen pixels each frame |
+| **5 default agents** | Rex (boss/F3), Nova + Axel (devs/F1), Pixel + Scout (design+research/F2) |
+| **Unlimited agents** | Add as many agents as you want, assign to any floor and desk |
+| **Named agents** | Give each agent a name, role, colour, floor, and custom personality |
+| **Boss orchestration** | Boss plans → workers execute in parallel → Boss synthesises results |
 | **Direct chat** | Talk to any individual agent one-on-one |
-| **Web search tool** | Agents use DuckDuckGo search (free, no key) |
-| **Sandboxed files** | Each agent has an isolated workspace; cannot touch your system |
-| **File browser** | See and read files agents produce, with copy button |
-| **Toast notifications** | Live pop-ups when tasks complete or fail |
-| **USB portable** | Drop `.agentoffice-portable` next to AppImage → data stays on USB |
+| **Tool use** | Agents search the web (DuckDuckGo, free) and read/write sandboxed files |
+| **Multi-AI support** | Ollama (local/free) · Groq (cloud/free) · OpenAI · LM Studio · any OpenAI-compatible |
+| **Per-agent models** | Each agent can use a completely different AI provider and model |
+| **File browser** | See and read every file an agent has produced, with copy button |
+| **Toast notifications** | Live pop-ups when tasks complete, fail, or agents join |
+| **USB portable** | Place `.swik-portable` next to the binary — all data stays on the USB |
+| **Web deployment** | Deploy with Docker and use from any browser with any cloud AI API |
+| **Desktop app** | Electron builds for Linux (AppImage/deb) and Windows |
 
 ---
 
-## Quickstart (Browser Dev Mode)
+## Quick Start
+
+### Option 1 — Web browser (simplest)
 
 ```bash
-# 1. Install Ollama and pull a model
+# 1. Install Ollama (free local AI) — or configure a cloud API in .env
 curl -fsSL https://ollama.com/install.sh | sh
-ollama serve &
-ollama pull llama3.2      # 2 GB — recommended
+ollama serve & ollama pull llama3.2
 
-# 2. Run
-cd agentoffice
-./start.sh
-# → opens http://localhost:5174
+# 2. Clone and run
+git clone https://github.com/Chintanpatel24/swik
+cd swik
+./start.sh web
 ```
 
-## Quickstart (Electron Desktop App)
+Open **http://localhost:5175**
+
+### Option 2 — Desktop Electron app
 
 ```bash
-cd agentoffice
+cd swik
 npm install
-npm run dev    # Electron window opens automatically
+npm run dev       # opens Electron window automatically
 ```
+
+### Option 3 — Docker (production / web deployment)
+
+```bash
+cd swik
+cp .env.example .env
+# Edit .env — set your AI provider keys
+
+docker compose up -d
+```
+
+Open **http://localhost:7843**
+
+With local AI (Ollama inside Docker):
+```bash
+docker compose --profile local-ai up -d
+```
+
+### Option 4 — USB Portable
+
+```bash
+# Build portable AppImage
+npm run package:linux
+
+# Enable USB mode
+touch /path/to/usb/.swik-portable
+cp dist/SWIK-*.AppImage /path/to/usb/
+
+# Plug into any Linux machine — all data (agents, tasks, files) stays on the USB
+```
+
+---
+
+## AI Providers
+
+Each agent can use a **different** AI provider and model. Mix and match freely.
+
+| Provider | Type | Cost | Setup |
+|----------|------|------|-------|
+| **Ollama** | Local | **Free** | `ollama serve && ollama pull llama3.2` |
+| **LM Studio** | Local | **Free** | Enable local server on port 1234 |
+| **Groq** | Cloud | **Free tier** | [console.groq.com](https://console.groq.com) |
+| **OpenAI** | Cloud | Paid | [platform.openai.com](https://platform.openai.com) |
+| **Together AI** | Cloud | Paid/Free tier | [together.ai](https://together.ai) |
+| **llama.cpp** | Local | **Free** | Run with `--server` flag |
+| **Any OpenAI-compat** | Any | Varies | Set base URL + key |
+
+---
+
+## Building Layout
+
+```
+Floor 3 — Penthouse  ← Boss agents (planning, delegation, synthesis)
+Floor 2 — Mid Floor  ← Design, research, analysis
+Floor 1 — Ground     ← Development, engineering, DevOps
+```
+
+Assign any agent to any floor. The 3D building stacks all three floors so you can orbit the camera to see all levels simultaneously.
 
 ---
 
 ## Project Structure
 
 ```
-agentoffice/
+swik/
+│
+├── start.sh                    ← One-command launcher (web/desktop/docker)
+├── docker-compose.yml          ← Full web deployment with optional Ollama
+├── Dockerfile                  ← Multi-stage production build
+├── .env.example                ← All configuration options documented
 │
 ├── electron/
-│   ├── main.js           ← Electron shell, window, USB detection
-│   └── preload.js        ← Secure IPC bridge
+│   ├── main.js                 ← Window, USB portable detection, IPC
+│   └── preload.js              ← Secure bridge to renderer
 │
 ├── backend/src/
-│   ├── server.js         ← Express + WebSocket (port 7842)
-│   ├── db.js             ← SQLite: agents, tasks, messages
+│   ├── server.js               ← Express + WebSocket + static serving
+│   ├── db.js                   ← SQLite (floors, agents, tasks, messages)
+│   ├── config.js               ← Centralised config from .env
 │   ├── agents/
-│   │   ├── orchestrator.js    ← Boss coordinates the team
-│   │   ├── agentExecutor.js   ← Single agent runs task with tools
-│   │   └── aiRunner.js        ← Ollama + OpenAI-compat AI calls
+│   │   ├── orchestrator.js     ← Boss plans → delegates → synthesises
+│   │   ├── agentExecutor.js    ← Single agent + tool-use loop
+│   │   └── aiRunner.js         ← Ollama + OpenAI-compat API calls
 │   └── tools/
-│       ├── webSearch.js       ← DuckDuckGo (free, no key)
-│       └── fileSystem.js      ← Sandboxed per-agent workspace
+│       ├── webSearch.js        ← DuckDuckGo (free) + SerpAPI fallback
+│       └── fileSystem.js       ← Sandboxed per-agent workspace
 │
 ├── public/
 │   ├── models/
-│   │   ├── office.glb         ← 3D office room (from The Delegation)
-│   │   └── character.glb      ← Animated character (from The Delegation)
-│   └── vendor/draco/          ← DRACO decoders for compressed GLB
+│   │   ├── office.glb          ← 3D office room (from The Delegation)
+│   │   └── character.glb       ← Animated character (from The Delegation)
+│   └── vendor/draco/           ← DRACO mesh decoders
 │
 └── src/
-    ├── App.jsx
+    ├── App.jsx                 ← Root layout
+    ├── hooks/useSwik.js        ← WebSocket state + all API helpers
     ├── three/
-    │   ├── SceneManager.js    ← Orchestrates all Three.js subsystems
-    │   ├── Stage.js           ← Camera (45°, pos 10/8/15), OrbitControls, lights
-    │   ├── WorldManager.js    ← Loads office.glb + DRACO, theme color
+    │   ├── Stage.js            ← Camera (45°), OrbitControls, lights
+    │   ├── BuildingManager.js  ← Loads office.glb × 3 floors, fallback procedural
     │   ├── CharacterManager.js ← SkeletonUtils.clone, AnimationMixer per agent
-    │   └── InputManager.js    ← Raycasts clicks/hovers → agentId
+    │   └── SceneManager.js     ← Orchestrates render loop + bubble projection
     ├── components/
-    │   ├── Office/
-    │   │   ├── OfficeCanvas.jsx   ← Mounts Three.js + React bubble overlay
-    │   │   ├── Sidebar.jsx        ← Agent roster with edit buttons
-    │   │   ├── TitleBar.jsx       ← Frameless window controls
-    │   │   └── ToastStack.jsx     ← Pop-up notifications
-    │   ├── Chat/ChatPanel.jsx     ← Messages + task dispatch form
+    │   ├── Building/
+    │   │   ├── TitleBar.jsx    ← Frameless window bar, USB badge, clock
+    │   │   ├── Sidebar.jsx     ← Floor-grouped agent roster
+    │   │   └── BuildingCanvas.jsx ← Three.js mount + React bubble overlay
+    │   ├── Chat/
+    │   │   └── ChatPanel.jsx   ← DM + task dispatch form
     │   ├── Task/
-    │   │   ├── TaskPanel.jsx      ← Task list + results
-    │   │   └── WorkspacePanel.jsx ← File browser for agent output
-    │   └── Settings/
-    │       └── AgentEditor.jsx    ← Tabbed create/edit modal
-    └── hooks/useOffice.js         ← WebSocket state + all API calls
+    │   │   └── TaskPanels.jsx  ← Task list + workspace file browser
+    │   ├── Settings/
+    │   │   └── AgentEditor.jsx ← Tabbed create/edit modal with floor selector
+    │   └── Common/
+    │       ├── ToastStack.jsx  ← Slide-in notifications
+    │       └── AIStatusBar.jsx ← Live AI provider health check
+    └── styles/main.css         ← Full dark HQ design system
 ```
 
 ---
 
-## Adding Agents
+## Configuration
 
-Click **+ ADD AGENT** in the sidebar. Configure:
-
-| Tab | Fields |
-|-----|--------|
-| **Identity** | Name, role, colour, skills list |
-| **AI Model** | Provider (Ollama/Groq/OpenAI/etc), API URL, API key, model |
-| **Behaviour** | System prompt (or use a preset) |
-
----
-
-## Dispatching Tasks
-
-1. Click **⚡ TASKS** → **NEW TASK** (or use the Chat panel)
-2. Write a title and description
-3. Hit **DISPATCH TO TEAM**
-
-The Boss agent (Rex by default) plans, delegates to the right agents, each works (with web search + file I/O if needed), and Rex synthesises the final result.
-
----
-
-## AI Providers
-
-| Provider | Type | Cost | Setup |
-|----------|------|------|-------|
-| Ollama | Local | **Free** | `ollama serve && ollama pull llama3.2` |
-| LM Studio | Local | **Free** | Enable local server in LM Studio |
-| Groq | Cloud | **Free tier** | `console.groq.com` |
-| OpenAI | Cloud | Paid | `platform.openai.com` |
-| llama.cpp | Local | **Free** | Run with `--server` flag |
-
-Each agent can use a **different provider and model** — mix and match.
-
----
-
-## USB Portable Mode
+Copy `.env.example` to `.env` and set your values:
 
 ```bash
-npm run portable          # builds AgentOffice.AppImage
+cp .env.example .env
+```
 
-# Enable USB mode:
-touch /path/to/usb/.agentoffice-portable
+Key settings:
 
-# Copy AppImage to same USB — all data (SQLite, workspaces) stays on USB
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SWIK_DEFAULT_PROVIDER` | `ollama` | AI provider for new agents |
+| `SWIK_DEFAULT_MODEL` | `llama3.2` | Default model name |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint |
+| `GROQ_API_KEY` | — | Groq cloud API key |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `SWIK_DATA_DIR` | `~/.config/swik` | Where data is stored (set to USB path for portable mode) |
+| `PORT` | `7843` | Backend port |
+
+---
+
+## Web Deployment
+
+SWIK can be deployed as a full web app for use from any device:
+
+```bash
+# Build and serve with Docker
+docker compose up -d
+
+# Access from any browser on your network
+open http://your-server-ip:7843
+```
+
+For production with a custom domain, put nginx in front:
+
+```nginx
+server {
+    listen 80;
+    server_name swik.yourdomain.com;
+    location / { proxy_pass http://localhost:7843; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; }
+}
 ```
 
 ---
 
-## Credits
+## Open Source & Credits
 
-3D assets (`office.glb`, `character.glb`) and Three.js architecture patterns from [The Delegation](https://github.com/google-gemini/the-delegation) — Apache 2.0 License.
+SWIK is MIT licensed and fully open source.
+**Repo:** [github.com/Chintanpatel24/swik](https://github.com/Chintanpatel24/swik)
+
+### Built on the shoulders of giants
+
+| Project | Use in SWIK | License |
+|---------|-------------|---------|
+| [**The Delegation**](https://github.com/google-gemini/the-delegation) by Google Gemini | `office.glb` + `character.glb` 3D assets, Three.js architecture patterns (Stage/WorldManager/CharacterManager/OrbitControls setup) | Apache 2.0 |
+| [**MiroFish**](https://github.com/666ghj/MiroFish) by 666ghj | Multi-agent orchestration patterns, LLM client design (OpenAI-compatible wrapper), agent tool-use loop | MIT |
+| [**Three.js**](https://threejs.org) | 3D WebGL rendering engine | MIT |
+| [**Ollama**](https://ollama.com) | Local AI model runner | MIT |
+| [**better-sqlite3**](https://github.com/WiseLibs/better-sqlite3) | SQLite database | MIT |
+| [**Electron**](https://www.electronjs.org) | Desktop app shell | MIT |
+
+### Contributing
+
+PRs welcome! Ideas for contributions:
+- More floor types (server room, meeting room, reception)
+- Agent-to-agent real-time conversation visualization
+- Custom 3D avatar skins per role
+- Plugin system for new tools (GitHub, Jira, Slack)
+- Memory system (vector DB for long-term agent memory)
+- Export task results as PDF/Markdown
+
+---
+
+<div align="center">
+Made with ❤️ by <a href="https://github.com/Chintanpatel24">Chintan Patel</a> · 
+<a href="https://github.com/Chintanpatel24/swik">github.com/Chintanpatel24/swik</a>
+</div>

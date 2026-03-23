@@ -5,18 +5,10 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   server: {
-    port: 5174,
+    port: 5175,
     proxy: {
-      '/api': { target: 'http://localhost:7842', changeOrigin: true },
+      '/api': { target: 'http://localhost:7843', changeOrigin: true }
     }
   },
-  build: { outDir: 'dist', emptyOutDir: true },
-  optimizeDeps: {
-    exclude: ['three/addons']
-  },
-  resolve: {
-    alias: {
-      // allow "three/addons/..." imports in node_modules to resolve correctly
-    }
-  }
+  build: { outDir: 'dist', emptyOutDir: true }
 });

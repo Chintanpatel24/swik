@@ -1,59 +1,74 @@
 const express  = require('express');
-const { createServer } = require('http');
+const http     = require('http');
 const { WebSocketServer } = require('ws');
 const cors     = require('cors');
-const { v4: uuidv4 } = require('uuid');
-const { agentOps, taskOps, msgOps } = require('./db');
+const path     = require('path');
+const fs       = require('fs');
+const { v4: uuid } = require('uuid');
+
+const config   = require('./config');
+const { agentOps, taskOps, msgOps, settingsOps } = require('./db');
 const { orchestrateTask }  = require('./agents/orchestrator');
+const { checkProvider, callAI } = require('./agents/aiRunner');
 const { webSearch }        = require('./tools/webSearch');
 const { fsTool }           = require('./tools/fileSystem');
 
-const PORT = parseInt(process.env.BACKEND_PORT || '7842', 10);
-const app  = express();
-const srv  = createServer(app);
-const wss  = new WebSocketServer({ server: srv });
+const app = express();
+const srv = http.createServer(app);
+const wss = new WebSocketServer({ server: srv });
 
-app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+// ── Middleware ────────────────────────────────────────────────
+app.use(cors({ origin: '*' }));
+app.use(express.json({ limit: '10mb' }));
 
-// ── WebSocket ──────────────────────────────────────────────────
-function broadcast(msg) {
-  const payload = JSON.stringify(msg);
-  wss.clients.forEach(c => { if (c.readyState === 1) c.send(payload); });
+// Serve built frontend in production / Docker
+const distPath = path.join(__dirname, '../../dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
 }
 
-wss.on('connection', (ws) => {
+// ── WebSocket ─────────────────────────────────────────────────
+function broadcast(msg) {
+  const p = JSON.stringify(msg);
+  wss.clients.forEach(c => { if (c.readyState === 1) c.send(p); });
+}
+
+wss.on('connection', ws => {
   ws.send(JSON.stringify({
     type: 'init',
     data: {
       agents:   agentOps.getAll(),
       tasks:    taskOps.getAll(),
-      messages: msgOps.getRecent(100)
-    }
+      messages: msgOps.getRecent(150),
+      settings: settingsOps.getAll(),
+      config: {
+        defaultProvider: config.ai.defaultProvider,
+        defaultModel:    config.ai.defaultModel,
+        isDesktop:       config.isDesktop,
+      },
+    },
   }));
-  ws.on('error', (e) => console.error('[WS]', e.message));
+  ws.on('error', e => console.error('[WS]', e.message));
 });
 
 // ── AGENTS ────────────────────────────────────────────────────
 app.get('/api/agents', (_, res) => res.json(agentOps.getAll()));
 
 app.post('/api/agents', (req, res) => {
-  const data  = req.body;
+  const d = req.body;
   const agent = {
-    id:            uuidv4(),
-    name:          data.name          || 'Agent',
-    role:          data.role          || 'developer',
-    avatar:        data.avatar        || 'default',
-    color:         data.color         || '#4f8ef7',
-    model:         data.model         || 'llama3.2',
-    api_type:      data.api_type      || 'ollama',
-    api_url:       data.api_url       || 'http://localhost:11434',
-    api_key:       data.api_key       || null,
-    system_prompt: data.system_prompt || '',
-    skills:        Array.isArray(data.skills) ? data.skills : (data.skills || []),
-    desk_x:        data.desk_x        || 300,
-    desk_y:        data.desk_y        || 300,
-    enabled:       data.enabled ?? 1,
+    id:           uuid(),
+    name:         d.name          || 'Agent',
+    role:         d.role          || 'developer',
+    color:        d.color         || '#4f8ef7',
+    floor:        d.floor         || 1,
+    desk_index:   d.desk_index    || 0,
+    model:        d.model         || config.ai.defaultModel,
+    provider:     d.provider      || config.ai.defaultProvider,
+    api_url:      d.api_url       || config.ai.ollama.url,
+    api_key:      d.api_key       || null,
+    system_prompt:d.system_prompt || '',
+    skills:       d.skills        || [],
   };
   agentOps.create(agent);
   const created = agentOps.getById(agent.id);
@@ -62,15 +77,10 @@ app.post('/api/agents', (req, res) => {
 });
 
 app.put('/api/agents/:id', (req, res) => {
-  const data = req.body;
-  // Ensure skills is always stored as a JSON array string
-  if (Array.isArray(data.skills)) {
-    // already array — db layer will stringify
-  }
-  agentOps.update(req.params.id, data);
-  const updated = agentOps.getById(req.params.id);
-  broadcast({ type: 'agent_updated', data: updated });
-  res.json(updated);
+  agentOps.update(req.params.id, req.body);
+  const u = agentOps.getById(req.params.id);
+  broadcast({ type: 'agent_updated', data: u });
+  res.json(u);
 });
 
 app.delete('/api/agents/:id', (req, res) => {
@@ -79,32 +89,19 @@ app.delete('/api/agents/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.patch('/api/agents/:id/position', (req, res) => {
-  const { x, y } = req.body;
-  agentOps.updatePos(req.params.id, x, y);
-  broadcast({ type: 'agent_moved', data: { id: req.params.id, x, y } });
-  res.json({ ok: true });
-});
-
 // ── TASKS ─────────────────────────────────────────────────────
 app.get('/api/tasks', (_, res) => res.json(taskOps.getAll()));
 
 app.post('/api/tasks', async (req, res) => {
-  const task = {
-    id:          uuidv4(),
-    title:       req.body.title       || 'Task',
-    description: req.body.description || '',
-    created_by:  req.body.created_by  || 'user',
-  };
+  const d    = req.body;
+  const task = { id: uuid(), title: d.title||'Task', description: d.description||'' };
   taskOps.create(task);
   const created = taskOps.getById(task.id);
   broadcast({ type: 'task_created', data: created });
   res.json({ ok: true, taskId: task.id });
 
-  // Run async — don't await
-  orchestrateTask(task.id, broadcast).catch(err => {
-    console.error('[Orchestrator]', err.message);
-    taskOps.update(task.id, { ...task, status: 'error', result: err.message });
+  orchestrateTask(task.id, broadcast).catch(e => {
+    taskOps.update(task.id, { ...task, status: 'error', result: e.message });
     broadcast({ type: 'task_update', data: taskOps.getById(task.id) });
   });
 });
@@ -118,48 +115,59 @@ app.delete('/api/tasks/:id', (req, res) => {
 app.get('/api/tasks/:id/messages', (req, res) =>
   res.json(msgOps.getByTask(req.params.id)));
 
-// ── MESSAGES ──────────────────────────────────────────────────
-app.get('/api/messages', (_, res) => res.json(msgOps.getRecent(100)));
+// ── MESSAGES (direct chat) ────────────────────────────────────
+app.get('/api/messages', (_, res) => res.json(msgOps.getRecent(150)));
 
 app.post('/api/messages', async (req, res) => {
   const { to_agent, content } = req.body;
   const agent = agentOps.getById(to_agent);
   if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-  const userMsg = { id: uuidv4(), from_agent: 'user', to_agent, content, type: 'user' };
+  const userMsg = { id: uuid(), from_agent: 'user', to_agent, content, type: 'user' };
   msgOps.create(userMsg);
   broadcast({ type: 'new_message', data: { ...userMsg, from_agent_name: 'You' } });
   res.json({ ok: true });
 
-  // Async agent reply
   broadcast({ type: 'agent_status', data: { agentId: to_agent, status: 'thinking', message: 'composing reply…' } });
   try {
-    const { callAI } = require('./agents/aiRunner');
     const reply = await callAI(agent, [
       { role: 'system', content: agent.system_prompt || `You are ${agent.name}.` },
-      { role: 'user',   content }
+      { role: 'user',   content },
     ]);
-    const replyMsg = { id: uuidv4(), from_agent: to_agent, to_agent: 'user', content: reply, type: 'chat' };
-    msgOps.create(replyMsg);
-    broadcast({ type: 'new_message', data: { ...replyMsg, from_agent_name: agent.name } });
+    const rm = { id: uuid(), from_agent: to_agent, to_agent: 'user', content: reply, type: 'chat' };
+    msgOps.create(rm);
+    broadcast({ type: 'new_message', data: { ...rm, from_agent_name: agent.name } });
   } catch (e) {
-    console.error('[Chat]', e.message);
-    const errMsg = { id: uuidv4(), from_agent: to_agent, to_agent: 'user',
-      content: `(AI error: ${e.message})`, type: 'error' };
-    msgOps.create(errMsg);
-    broadcast({ type: 'new_message', data: { ...errMsg, from_agent_name: agent.name } });
+    const em = { id: uuid(), from_agent: to_agent, to_agent: 'user', content: `(AI error: ${e.message})`, type: 'error' };
+    msgOps.create(em);
+    broadcast({ type: 'new_message', data: { ...em, from_agent_name: agent.name } });
   }
   broadcast({ type: 'agent_status', data: { agentId: to_agent, status: 'idle' } });
 });
 
 // ── WORKSPACE ─────────────────────────────────────────────────
-app.get('/api/workspace/:agentId', (req, res) => {
-  const result = fsTool.list(req.params.agentId, req.query.taskId || 'general');
-  res.json(result);
+app.get('/api/workspace/:agentId', (req, res) =>
+  res.json(fsTool.list(req.params.agentId, req.query.taskId || 'general')));
+
+app.get('/api/workspace/:agentId/file', (req, res) =>
+  res.json(fsTool.read(req.params.agentId, req.query.taskId||'general', req.query.path)));
+
+// ── SETTINGS ─────────────────────────────────────────────────
+app.get('/api/settings', (_, res) => res.json(settingsOps.getAll()));
+app.post('/api/settings', (req, res) => {
+  const { key, value } = req.body;
+  settingsOps.set(key, value);
+  broadcast({ type: 'settings_updated', data: settingsOps.getAll() });
+  res.json({ ok: true });
 });
 
-app.get('/api/workspace/:agentId/file', (req, res) => {
-  const result = fsTool.read(req.params.agentId, req.query.taskId || 'general', req.query.path);
+// ── AI STATUS ─────────────────────────────────────────────────
+app.get('/api/ai/status', async (req, res) => {
+  const provider = req.query.provider || config.ai.defaultProvider;
+  const url      = req.query.url      || config.ai.ollama.url;
+  const apiKey   = req.query.key      || '';
+  const model    = req.query.model    || config.ai.defaultModel;
+  const result   = await checkProvider(provider, url, apiKey, model);
   res.json(result);
 });
 
@@ -169,14 +177,30 @@ app.post('/api/search', async (req, res) => {
   res.json(result);
 });
 
-// ── HEALTH ────────────────────────────────────────────────────
-app.get('/api/health', (_, res) =>
-  res.json({ ok: true, uptime: Math.floor(process.uptime()), agents: agentOps.getAll().length }));
+// ── HEALTH ───────────────────────────────────────────────────
+app.get('/api/health', (_, res) => res.json({
+  ok: true, uptime: Math.floor(process.uptime()),
+  agents: agentOps.getAll().length,
+  dataDir: config.dataDir,
+  version: '1.0.0',
+}));
 
-// ── START ─────────────────────────────────────────────────────
-srv.listen(PORT, () => {
-  console.log(`\n⬡  AgentOffice Backend`);
-  console.log(`   HTTP  →  http://localhost:${PORT}`);
-  console.log(`   WS    →  ws://localhost:${PORT}`);
-  console.log(`   Data  →  ${process.env.AGENT_DATA_DIR || './data'}\n`);
+// SPA fallback — serves React app for all non-API routes (web mode)
+if (fs.existsSync(distPath)) {
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api/')) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    }
+  });
+}
+
+// ── Start ─────────────────────────────────────────────────────
+srv.listen(config.port, () => {
+  console.log(`\n⬡  SWIK — AI Agent Headquarters`);
+  console.log(`   Backend  →  http://localhost:${config.port}`);
+  console.log(`   WebSocket→  ws://localhost:${config.port}`);
+  console.log(`   Data Dir →  ${config.dataDir}`);
+  console.log(`   Mode     →  ${config.isDesktop ? 'Desktop (Electron)' : 'Web'}`);
+  if (fs.existsSync(distPath)) console.log(`   Frontend →  http://localhost:${config.port} (served from dist/)`);
+  console.log('');
 });

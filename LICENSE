@@ -1,6 +1,7 @@
 MIT License
 
-Copyright (c) 2026 Chintan Patel
+Copyright (c) 2024 Chintan Patel
+https://github.com/Chintanpatel24/swik
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +20,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+THIRD-PARTY NOTICES
+
+1. 3D Assets (office.glb, character.glb) and Three.js architecture patterns
+   from "The Delegation" by Google Gemini Team
+   https://github.com/google-gemini/the-delegation
+   Licensed under the Apache License 2.0
+
+2. Multi-agent orchestration patterns from "MiroFish" by 666ghj
+   https://github.com/666ghj/MiroFish
+   Licensed under the MIT License

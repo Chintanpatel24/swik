@@ -1,142 +1,114 @@
-// agents/orchestrator.js — Boss agent coordinates the whole team
-const { callAI }        = require('./aiRunner');
-const { executeAgent }  = require('./agentExecutor');
+const { callAI }       = require('./aiRunner');
+const { executeAgent } = require('./agentExecutor');
 const { agentOps, taskOps, msgOps } = require('../db');
-const { v4: uuidv4 }    = require('uuid');
+const { v4: uuid }     = require('uuid');
 
 async function orchestrateTask(taskId, broadcast) {
-  const task   = taskOps.getById(taskId);
+  const task = taskOps.getById(taskId);
   if (!task) throw new Error(`Task ${taskId} not found`);
 
-  const agents = agentOps.getAll().filter(a => a.enabled);
-  const boss   = agents.find(a => a.role === 'boss');
-  const workers= agents.filter(a => a.role !== 'boss');
+  const all     = agentOps.getAll();
+  const boss    = all.find(a => a.role === 'boss');
+  const workers = all.filter(a => a.role !== 'boss');
 
-  const emit = (type, data) => broadcast && broadcast({ type, data });
+  const emit = (type, data) => broadcast?.({ type, data });
 
-  // Mark task as running
+  const saveMsg = (from, to, content, type='chat') => {
+    const msg = {
+      id: uuid(), task_id: taskId,
+      from_agent: from?.id || from,
+      to_agent:   to?.id   || to   || null,
+      content, type,
+    };
+    msgOps.create(msg);
+    emit('new_message', { ...msg, from_agent_name: from?.name || from });
+    return msg;
+  };
+
   taskOps.update(taskId, { ...task, status: 'running', assigned_to: boss?.id });
   emit('task_update', taskOps.getById(taskId));
 
-  function saveMsg(fromAgent, toAgent, content, type = 'chat') {
-    const msg = {
-      id: uuidv4(), task_id: taskId,
-      from_agent: fromAgent?.id || fromAgent,
-      to_agent:   toAgent?.id  || toAgent || null,
-      content, type
-    };
-    msgOps.create(msg);
-    emit('new_message', { ...msg, from_agent_name: fromAgent?.name || fromAgent });
-    return msg;
-  }
+  // ── Step 1: Boss plans ──────────────────────────────────────
+  emit('agent_status', { agentId: boss?.id, status: 'thinking', message: 'Planning task…' });
 
-  // ── STEP 1: Boss analyses task ─────────────────────────────────────────
-  emit('agent_status', { agentId: boss?.id, status: 'thinking', message: 'Analysing task...' });
-
-  const workerList = workers.map(w =>
-    `- ${w.name} (${w.role}): skills = ${JSON.parse(w.skills || '[]').join(', ')}`
-  ).join('\n');
+  const workerDesc = workers.map(w => {
+    const skills = (() => { try { return JSON.parse(w.skills||'[]'); } catch { return []; } })();
+    return `- ${w.name} (${w.role}, Floor ${w.floor}): ${skills.join(', ')}`;
+  }).join('\n');
 
   let plan = '';
   if (boss) {
+    saveMsg(boss, null, `Analysing task: "${task.title}"`, 'thinking');
     try {
-      saveMsg(boss, null, `I'm analysing the task: "${task.title}"`, 'thinking');
-
       plan = await callAI(boss, [
-        { role: 'system', content: boss.system_prompt },
+        { role: 'system', content: boss.system_prompt || 'You are the boss.' },
         {
           role: 'user',
-          content: `Task: "${task.title}"\nDetails: ${task.description}\n\nYour team:\n${workerList}\n\nBreak this into specific subtasks, assign each to the right team member by name. Reply as JSON:\n{\n  "plan": "brief plan",\n  "subtasks": [\n    {"assignee": "name", "instruction": "specific instruction"}\n  ]\n}`
-        }
+          content: `Task: "${task.title}"\nDetails: ${task.description}\n\nTeam:\n${workerDesc}\n\nRespond ONLY with JSON:\n{"plan":"brief plan","subtasks":[{"assignee":"name","instruction":"specific instruction"}]}`,
+        },
       ]);
-
       saveMsg(boss, null, plan, 'planning');
     } catch (e) {
-      console.error('[Boss] planning error:', e.message);
+      console.error('[Boss]', e.message);
       plan = JSON.stringify({ plan: task.description, subtasks: [{ assignee: workers[0]?.name, instruction: task.description }] });
     }
   }
 
-  // ── STEP 2: Parse plan and run subtasks ────────────────────────────────
+  // ── Step 2: Parse and delegate ──────────────────────────────
   let subtasks = [];
   try {
-    const jsonMatch = plan.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      subtasks = parsed.subtasks || [];
-    }
-  } catch {
-    // If boss plan can't be parsed, just assign to first available worker
-    subtasks = workers.slice(0, 2).map(w => ({
-      assignee: w.name,
-      instruction: task.description
-    }));
+    const json = plan.match(/\{[\s\S]*\}/)?.[0];
+    if (json) subtasks = JSON.parse(json).subtasks || [];
+  } catch {}
+  if (!subtasks.length) {
+    subtasks = workers.slice(0, 2).map(w => ({ assignee: w.name, instruction: task.description }));
   }
 
-  if (subtasks.length === 0) {
-    subtasks = [{ assignee: workers[0]?.name || 'dev', instruction: task.description }];
-  }
+  // ── Step 3: Workers execute in parallel ─────────────────────
+  const results = await Promise.all(subtasks.map(async sub => {
+    const worker = workers.find(w => w.name.toLowerCase() === sub.assignee?.toLowerCase()) || workers[0];
+    if (!worker) return null;
 
-  // ── STEP 3: Execute subtasks in parallel ──────────────────────────────
-  const results = [];
-
-  await Promise.all(subtasks.map(async (subtask) => {
-    const worker = workers.find(w =>
-      w.name.toLowerCase() === subtask.assignee?.toLowerCase()
-    ) || workers[0];
-
-    if (!worker) return;
-
-    emit('agent_status', { agentId: worker.id, status: 'working', message: `Working on: ${subtask.instruction.slice(0, 50)}...` });
-
-    if (boss) saveMsg(boss, worker, `${worker.name}, please: ${subtask.instruction}`, 'delegation');
+    if (boss) saveMsg(boss, worker, `${worker.name}, please: ${sub.instruction}`, 'delegation');
+    emit('agent_status', { agentId: worker.id, status: 'working', message: sub.instruction.slice(0, 60) });
 
     const result = await executeAgent({
       agent: worker,
-      task:  { ...task, description: subtask.instruction },
+      task:  { ...task, description: sub.instruction },
       onUpdate: ({ type, data }) => {
         if (type === 'thinking') emit('agent_status', { agentId: worker.id, status: 'thinking', message: data.message });
         if (type === 'tool_use') {
-          emit('agent_status', { agentId: worker.id, status: 'searching', message: `Using: ${data.tool}` });
-          saveMsg(worker, null, `Using tool: ${data.tool} ${JSON.stringify(data.args)}`, 'tool');
+          emit('agent_status', { agentId: worker.id, status: 'searching', message: `Using ${data.tool}` });
+          saveMsg(worker, null, `Using tool: ${data.tool}`, 'tool');
         }
-        if (type === 'done') {
-          saveMsg(worker, boss, data.response.slice(0, 1000) + (data.response.length > 1000 ? '...' : ''), 'result');
+        if (type === 'done')  {
+          saveMsg(worker, boss, (data.response||'').slice(0, 800), 'result');
           emit('agent_status', { agentId: worker.id, status: 'idle' });
         }
-        emit('agent_update', { agentId: worker.id, type, data });
-      }
+      },
     });
-
-    results.push({ agent: worker.name, ...result });
+    return { agent: worker.name, ...result };
   }));
 
-  // ── STEP 4: Boss synthesises results ──────────────────────────────────
-  let finalResult = results.map(r => `${r.agent}: ${r.response || r.error}`).join('\n\n---\n\n');
+  // ── Step 4: Boss synthesises ────────────────────────────────
+  let finalResult = results.filter(Boolean).map(r => `**${r.agent}**: ${r.response || r.error}`).join('\n\n---\n\n');
 
-  if (boss && results.length > 0) {
-    emit('agent_status', { agentId: boss.id, status: 'thinking', message: 'Synthesising results...' });
+  if (boss && results.filter(Boolean).length) {
+    emit('agent_status', { agentId: boss.id, status: 'thinking', message: 'Synthesising results…' });
     try {
       const synthesis = await callAI(boss, [
-        { role: 'system', content: boss.system_prompt },
-        {
-          role: 'user',
-          content: `The team has completed the task "${task.title}". Here are their results:\n\n${finalResult}\n\nProvide a concise final summary and conclusion.`
-        }
+        { role: 'system', content: boss.system_prompt || 'You are the boss.' },
+        { role: 'user', content: `Task "${task.title}" completed. Team results:\n\n${finalResult}\n\nWrite a concise final summary.` },
       ]);
       saveMsg(boss, null, synthesis, 'summary');
       finalResult = synthesis;
-    } catch (e) {
-      console.error('[Boss] synthesis error:', e.message);
-    }
+    } catch (e) { console.error('[Boss synthesis]', e.message); }
     emit('agent_status', { agentId: boss.id, status: 'idle' });
   }
 
-  // ── DONE ──────────────────────────────────────────────────────────────
   taskOps.update(taskId, { ...task, status: 'done', result: finalResult });
   emit('task_update', taskOps.getById(taskId));
   emit('task_complete', { taskId, result: finalResult });
-
   return { ok: true, result: finalResult };
 }
 

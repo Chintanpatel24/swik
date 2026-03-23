@@ -1,137 +1,114 @@
 import { useState, useEffect, useRef } from 'react';
 
-const MSG_COLORS = { user: '#4f8ef7', boss: '#f7c94f', dev: '#4f8ef7', design: '#f74faa', search: '#4ff7c4', write: '#c44ff7' };
+function Bubble({ msg, agents }) {
+  const isUser  = msg.from_agent === 'user';
+  const agent   = agents.find(a => a.id === msg.from_agent);
+  const color   = agent?.color || '#888';
+  const name    = isUser ? 'YOU' : (agent?.name || msg.from_agent_name || msg.from_agent);
 
-function AgentBubble({ msg, agents }) {
-  const agent = agents.find(a => a.id === msg.from_agent);
-  const isUser = msg.from_agent === 'user';
-  const color = agent?.color || '#888';
+  const TYPE_STYLE = {
+    planning:   'msg-planning',
+    delegation: 'msg-delegation',
+    tool:       'msg-tool',
+    result:     'msg-result',
+    summary:    'msg-summary',
+    error:      'msg-error',
+  };
 
   return (
-    <div className={`msg-row ${isUser ? 'msg-user' : 'msg-agent'}`}>
-      {!isUser && (
-        <div className="msg-avatar" style={{ background: color }}>
-          {(agent?.name || msg.from_agent_name || '?')[0].toUpperCase()}
-        </div>
-      )}
+    <div className={`msg-row ${isUser ? 'msg-right' : 'msg-left'}`}>
+      {!isUser && <div className="msg-av" style={{ background: color }}>{name[0]}</div>}
       <div className="msg-bubble-wrap">
-        {!isUser && <div className="msg-sender" style={{ color }}>{agent?.name || msg.from_agent_name || msg.from_agent}</div>}
-        <div className={`msg-bubble ${msg.type} ${isUser ? 'user-bubble' : ''}`} style={isUser ? {} : { borderLeftColor: color }}>
+        {!isUser && <div className="msg-sender" style={{ color }}>{name}</div>}
+        <div className={`msg-bubble ${isUser?'msg-bubble-user':''} ${TYPE_STYLE[msg.type]||''}`}
+          style={isUser ? {} : { borderLeftColor: color }}>
           {msg.content}
         </div>
-        <div className="msg-meta">
-          {msg.type !== 'chat' && msg.type !== 'user' && <span className="msg-type-tag">{msg.type}</span>}
-          {msg.to_agent && !isUser && (() => {
-            const to = agents.find(a => a.id === msg.to_agent);
-            return to ? <span className="msg-to">→ {to.name}</span> : null;
-          })()}
-        </div>
+        {msg.type && msg.type !== 'chat' && msg.type !== 'user' && (
+          <span className="msg-type-tag">{msg.type}</span>
+        )}
       </div>
-      {isUser && <div className="msg-avatar user-avatar">YOU</div>}
+      {isUser && <div className="msg-av msg-av-user">YOU</div>}
     </div>
   );
 }
 
 export default function ChatPanel({ agents, messages, selectedAgent, onSendMessage, onCreateTask }) {
-  const [tab, setTab] = useState('chat'); // chat | tasks
-  const [input, setInput] = useState('');
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDesc, setTaskDesc] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [tab,       setTab]      = useState('chat');
+  const [input,     setInput]    = useState('');
+  const [title,     setTitle]    = useState('');
+  const [desc,      setDesc]     = useState('');
+  const [sending,   setSending]  = useState(false);
   const bottomRef = useRef(null);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
-  const filteredMsgs = selectedAgent
-    ? messages.filter(m => m.from_agent === selectedAgent.id || m.to_agent === selectedAgent.id || m.to_agent === null)
+  const visible = selectedAgent
+    ? messages.filter(m => m.from_agent === selectedAgent.id || m.to_agent === selectedAgent.id || (!m.to_agent && m.from_agent !== 'user'))
     : messages;
 
   const handleSend = () => {
-    if (!input.trim()) return;
-    if (!selectedAgent) return;
+    if (!input.trim() || !selectedAgent) return;
     onSendMessage(selectedAgent.id, input.trim());
     setInput('');
   };
 
   const handleTask = async () => {
-    if (!taskTitle.trim() || !taskDesc.trim()) return;
-    setCreating(true);
-    await onCreateTask({ title: taskTitle.trim(), description: taskDesc.trim() });
-    setTaskTitle('');
-    setTaskDesc('');
-    setCreating(false);
+    if (!title.trim() || !desc.trim()) return;
+    setSending(true);
+    await onCreateTask({ title: title.trim(), description: desc.trim() });
+    setTitle(''); setDesc('');
+    setSending(false);
     setTab('chat');
   };
 
   return (
     <div className="chat-panel">
       <div className="chat-tabs">
-        <button className={`chat-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>
-          💬 CHAT
-        </button>
-        <button className={`chat-tab ${tab === 'task' ? 'active' : ''}`} onClick={() => setTab('task')}>
-          ⚡ NEW TASK
-        </button>
+        <button className={`ctab ${tab==='chat'?'active':''}`} onClick={()=>setTab('chat')}>💬 CHAT</button>
+        <button className={`ctab ${tab==='task'?'active':''}`} onClick={()=>setTab('task')}>⚡ DISPATCH</button>
       </div>
 
-      {tab === 'chat' && (
-        <>
-          <div className="chat-context">
-            {selectedAgent
-              ? <span style={{ color: selectedAgent.color }}>Chatting with <b>{selectedAgent.name}</b></span>
-              : <span>Select an agent to chat · Showing all messages</span>
-            }
-          </div>
+      {tab==='chat' && <>
+        <div className="chat-ctx">
+          {selectedAgent
+            ? <span style={{color:selectedAgent.color}}>Talking with <b>{selectedAgent.name}</b> (Floor {selectedAgent.floor})</span>
+            : <span className="dim">Select an agent to chat directly</span>}
+        </div>
 
-          <div className="chat-messages">
-            {filteredMsgs.length === 0 ? (
-              <div className="chat-empty">
-                <div>💬</div>
-                <p>No messages yet</p>
-                <p>Click an agent and say hello</p>
-              </div>
-            ) : (
-              filteredMsgs.map((m, i) => (
-                <AgentBubble key={m.id || i} msg={m} agents={agents}/>
-              ))
-            )}
-            <div ref={bottomRef}/>
-          </div>
+        <div className="chat-messages">
+          {visible.length === 0
+            ? <div className="chat-empty"><div>💬</div><p>No messages yet</p></div>
+            : visible.map((m,i) => <Bubble key={m.id||i} msg={m} agents={agents}/>)
+          }
+          <div ref={bottomRef}/>
+        </div>
 
-          <div className="chat-input-row">
-            <input
-              className="chat-input"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder={selectedAgent ? `Message ${selectedAgent.name}...` : 'Select an agent first...'}
-              disabled={!selectedAgent}
-            />
-            <button className="chat-send" onClick={handleSend} disabled={!selectedAgent || !input.trim()}>
-              SEND
-            </button>
-          </div>
-        </>
-      )}
+        <div className="chat-inputrow">
+          <input className="chat-inp"
+            value={input} onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&handleSend()}
+            placeholder={selectedAgent ? `Message ${selectedAgent.name}…` : 'Select an agent first…'}
+            disabled={!selectedAgent}/>
+          <button className="chat-send" onClick={handleSend} disabled={!selectedAgent||!input.trim()}>SEND</button>
+        </div>
+      </>}
 
-      {tab === 'task' && (
-        <div className="task-creator">
+      {tab==='task' && (
+        <div className="task-form">
           <p className="task-hint">
-            The Boss agent will analyse the task, break it into subtasks, and assign them to the right agents.
+            The Boss agent will analyse your task, break it into subtasks, delegate to the team, and synthesise a final result.
           </p>
-          <label className="field-label">TASK TITLE</label>
-          <input className="field-input" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="Build a login page..."/>
+          <label className="f-label">TASK TITLE</label>
+          <input className="f-input" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Build a login page…"/>
 
-          <label className="field-label">DETAILS</label>
-          <textarea className="field-input field-textarea"
-            value={taskDesc} onChange={e => setTaskDesc(e.target.value)}
-            placeholder="Describe what you need in detail. The agents will plan and execute it together..."/>
+          <label className="f-label">DETAILS</label>
+          <textarea className="f-input f-textarea" value={desc} onChange={e=>setDesc(e.target.value)}
+            placeholder="Describe what you need in detail…"/>
 
-          <button className="btn btn-primary" onClick={handleTask}
-            disabled={creating || !taskTitle.trim() || !taskDesc.trim()}>
-            {creating ? '⚡ DISPATCHING...' : '⚡ DISPATCH TO TEAM'}
+          <button className="btn-primary full-width" onClick={handleTask}
+            disabled={sending||!title.trim()||!desc.trim()}>
+            {sending ? '⚡ DISPATCHING…' : '⚡ DISPATCH TO TEAM'}
           </button>
         </div>
       )}

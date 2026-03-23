@@ -1,129 +1,102 @@
-// agents/agentExecutor.js
 const { callAI }    = require('./aiRunner');
 const { webSearch } = require('../tools/webSearch');
 const { fsTool }    = require('../tools/fileSystem');
-const { v4: uuidv4 }= require('uuid');
+const { v4: uuid }  = require('uuid');
 
-const TOOL_INSTRUCTIONS = `
-You have access to these tools. To use a tool, write EXACTLY this format on its own line:
+const TOOL_DOCS = `
+You have access to tools. To call one, write this EXACTLY on its own line:
 TOOL_CALL: {"tool":"<name>","args":{...}}
 
 Available tools:
-- web_search:  {"tool":"web_search","args":{"query":"search terms"}}
-- file_write:  {"tool":"file_write","args":{"path":"filename.js","content":"file content"}}
-- file_read:   {"tool":"file_read","args":{"path":"filename.js"}}
-- file_list:   {"tool":"file_list","args":{}}
+  web_search  — {"tool":"web_search","args":{"query":"your query"}}
+  file_write  — {"tool":"file_write","args":{"path":"filename.js","content":"..."}}
+  file_read   — {"tool":"file_read","args":{"path":"filename.js"}}
+  file_list   — {"tool":"file_list","args":{}}
 
-After using a tool you will receive a TOOL_RESULT. Use it to continue your response.
-Only use tools when genuinely needed. Always show your reasoning before calling a tool.
+After a TOOL_CALL you will receive TOOL_RESULT. Use it and continue.
+Only use tools when genuinely needed. Always explain what you are doing.
 `;
 
-async function executeAgent({ agent, task, previousMessages = [], onUpdate }) {
-  const emit = (type, data) => onUpdate && onUpdate({ type, agentId: agent.id, data });
+async function executeAgent({ agent, task, prevMessages = [], onUpdate }) {
+  const emit = (type, data) => onUpdate?.({ type, agentId: agent.id, data });
 
-  emit('thinking', { message: `${agent.name} is thinking...` });
+  emit('thinking', { message: `${agent.name} is reading the task…` });
 
-  // Build system message
-  const skills   = JSON.parse(agent.skills || '[]').join(', ');
-  const systemMsg = {
+  const skills  = (() => { try { return JSON.parse(agent.skills||'[]'); } catch { return []; } })();
+  const sysMsg  = {
     role: 'system',
-    content: `${agent.system_prompt}
+    content: `${agent.system_prompt || `You are ${agent.name}, a ${agent.role} agent.`}
 
-Your skills: ${skills}
+Your skills: ${skills.join(', ') || 'general'}
+Task: "${task.title}"
+Description: ${task.description}
 
-Current task: "${task.title}"
-Task description: ${task.description}
+${TOOL_DOCS}
 
-${TOOL_INSTRUCTIONS}
-
-Work in your isolated workspace. Be thorough and produce real, usable output.`
+Work thoughtfully. Produce real, usable output. Write files when creating code or documents.`,
   };
 
-  const messages = [
-    systemMsg,
-    ...previousMessages.map(m => ({
+  const msgs = [
+    sysMsg,
+    ...prevMessages.slice(-10).map(m => ({
       role:    m.from_agent === agent.id ? 'assistant' : 'user',
-      content: `[${m.from_agent_name || m.from_agent}]: ${m.content}`
+      content: `[${m.from_agent_name || m.from_agent}]: ${m.content}`,
     })),
-    {
-      role:    'user',
-      content: `Please work on this task: ${task.description}`
-    }
+    { role: 'user', content: `Please work on this: ${task.description}` },
   ];
 
-  let fullResponse  = '';
-  let iterCount     = 0;
-  const MAX_ITERS   = 5;
+  let fullResponse = '';
+  const MAX_ITERS  = 6;
 
-  while (iterCount < MAX_ITERS) {
-    iterCount++;
-
-    // Call AI with streaming
-    let aiOutput = '';
+  for (let i = 0; i < MAX_ITERS; i++) {
+    let aiOut = '';
     try {
-      aiOutput = await callAI(agent, messages, (token) => {
-        aiOutput += token;
-        emit('token', { token });
-      });
+      aiOut = await callAI(agent, msgs, tok => { aiOut += tok; emit('token', { token: tok }); });
     } catch (e) {
-      emit('error', { message: `AI call failed: ${e.message}` });
+      emit('error', { message: e.message });
       return { ok: false, error: e.message };
     }
 
-    fullResponse += aiOutput;
+    fullResponse += aiOut;
 
-    // ── PARSE TOOL CALLS ──────────────────────────────────────────────────
-    const toolCallRe = /TOOL_CALL:\s*(\{[\s\S]*?\})/gm;
-    let match;
-    let hadToolCall = false;
+    // Parse tool calls
+    const re = /TOOL_CALL:\s*(\{[\s\S]*?\})/gm;
+    let match; let hadTool = false;
+    while ((match = re.exec(aiOut)) !== null) {
+      hadTool = true;
+      let call;
+      try { call = JSON.parse(match[1]); } catch { continue; }
 
-    while ((match = toolCallRe.exec(aiOutput)) !== null) {
-      hadToolCall = true;
-      let toolCall;
-      try { toolCall = JSON.parse(match[1]); } catch { continue; }
-
-      const { tool, args } = toolCall;
+      const { tool, args } = call;
       emit('tool_use', { tool, args });
 
-      let toolResult;
-
+      let result;
       switch (tool) {
-        case 'web_search': {
-          emit('thinking', { message: `${agent.name} is searching: "${args.query}"` });
-          toolResult = await webSearch(args.query, 5);
+        case 'web_search':
+          emit('thinking', { message: `${agent.name} searching: "${args.query}"` });
+          result = await webSearch(args.query, 5);
           break;
-        }
-        case 'file_write': {
-          toolResult = fsTool.write(agent.id, task.id, args.path, args.content);
-          emit('file_written', { path: args.path, agentId: agent.id, taskId: task.id });
+        case 'file_write':
+          result = fsTool.write(agent.id, task.id, args.path, args.content);
+          emit('file_written', { path: args.path });
           break;
-        }
-        case 'file_read': {
-          toolResult = fsTool.read(agent.id, task.id, args.path);
+        case 'file_read':
+          result = fsTool.read(agent.id, task.id, args.path);
           break;
-        }
-        case 'file_list': {
-          toolResult = fsTool.list(agent.id, task.id);
+        case 'file_list':
+          result = fsTool.list(agent.id, task.id);
           break;
-        }
         default:
-          toolResult = { ok: false, error: `Unknown tool: ${tool}` };
+          result = { ok: false, error: `Unknown tool: ${tool}` };
       }
 
-      // Feed result back for next iteration
-      messages.push({ role: 'assistant', content: aiOutput });
-      messages.push({
-        role:    'user',
-        content: `TOOL_RESULT: ${JSON.stringify(toolResult, null, 2)}\n\nContinue your response based on this result.`
-      });
-
-      emit('tool_result', { tool, result: toolResult });
-      fullResponse += `\n[Tool: ${tool}]\n${JSON.stringify(toolResult, null, 2)}\n`;
-
-      break; // Process one tool call per iteration then re-run AI
+      msgs.push({ role: 'assistant', content: aiOut });
+      msgs.push({ role: 'user',      content: `TOOL_RESULT: ${JSON.stringify(result, null, 2)}\nContinue your response.` });
+      emit('tool_result', { tool, result });
+      break; // one tool per iteration
     }
 
-    if (!hadToolCall) break; // No tool calls → done
+    if (!hadTool) break;
   }
 
   emit('done', { response: fullResponse });
