@@ -1,120 +1,140 @@
-import { useState, useRef } from 'react';
-import AgentDesk from '../Agent/AgentDesk';
+import { useEffect, useRef, useState } from 'react';
+import { SceneManager } from '../../three/SceneManager.js';
 
-export default function OfficeCanvas({ agents, agentStatuses, messages, selectedAgent, onSelectAgent, onMoveAgent }) {
-  const canvasRef = useRef(null);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [panning, setPanning] = useState(false);
-  const panStart = useRef(null);
+const STATUS_META = {
+  idle:      { label: null,                  color: '#ffffff' },
+  thinking:  { label: '💭 thinking...',      color: '#f7c94f' },
+  working:   { label: '⚙ working',          color: '#4ff7c4' },
+  searching: { label: '🔍 searching web',   color: '#4f8ef7' },
+  talking:   { label: '💬 talking',          color: '#c44ff7' },
+  done:      { label: '✓ done',              color: '#4ff7c4' },
+  error:     { label: '✗ error',             color: '#f74f4f' },
+};
 
-  // Middle-mouse or space+drag to pan
-  function onMouseDown(e) {
-    if (e.button === 1 || e.altKey) {
-      e.preventDefault();
-      setPanning(true);
-      panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-    }
-  }
-  function onMouseMove(e) {
-    if (!panning) return;
-    setPan({ x: e.clientX - panStart.current.x, y: e.clientY - panStart.current.y });
-  }
-  function onMouseUp() { setPanning(false); }
-
-  // Get last message between two agents
-  const getLastMsg = (a, b) => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      if ((m.from_agent === a && m.to_agent === b) || (m.from_agent === b && m.to_agent === a)) {
-        return m;
-      }
-    }
-    return null;
-  };
-
-  // Draw lines between agents who recently communicated
-  const recentMsgs = messages.slice(-20);
-  const connections = [];
-  const seen = new Set();
-  for (const m of recentMsgs) {
-    if (!m.to_agent || m.from_agent === 'user' || m.to_agent === 'user') continue;
-    const key = [m.from_agent, m.to_agent].sort().join('-');
-    if (!seen.has(key)) {
-      seen.add(key);
-      const from = agents.find(a => a.id === m.from_agent);
-      const to   = agents.find(a => a.id === m.to_agent);
-      if (from && to) connections.push({ from, to, msg: m });
-    }
-  }
+function AgentBubble({ agent, pos, status, selected, hovered }) {
+  if (!pos) return null;
+  const meta    = STATUS_META[status?.status] || STATUS_META.idle;
+  const visible = selected || hovered || (status?.status && status.status !== 'idle');
+  if (!visible) return null;
 
   return (
-    <div
-      ref={canvasRef}
-      className={`office-canvas ${panning ? 'panning' : ''}`}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
-    >
-      {/* Background grid */}
-      <div className="office-grid" style={{ transform: `translate(${pan.x}px,${pan.y}px)` }}>
+    <div className="agent-bubble" style={{ left: pos.x, top: pos.y }}>
+      <div className="agent-bubble-inner" style={{ borderLeftColor: agent.color }}>
+        <span className="bubble-dot" style={{ background: agent.color }} />
+        <span className="bubble-name">{agent.name}</span>
+        {meta.label && (
+          <>
+            <span className="bubble-sep">·</span>
+            <span className="bubble-status" style={{ color: meta.color }}>{meta.label}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
-        {/* Room decorations */}
-        <div className="office-room">
-          <div className="room-label">⬡ AGENT OFFICE</div>
-          {/* Water cooler */}
-          <div className="decor water-cooler" style={{ left: 60, top: 60 }}>
-            <div className="wc-bottle"/>
-            <div className="wc-base"/>
-          </div>
-          {/* Plant */}
-          <div className="decor plant" style={{ right: 80, top: 60 }}>🪴</div>
-          {/* Clock */}
-          <div className="decor clock" style={{ left: '50%', top: 20 }}>
-            {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-          </div>
-          {/* Whiteboard */}
-          <div className="decor whiteboard" style={{ right: 40, top: 140 }}>
-            <div className="wb-text">TASKS</div>
-          </div>
+export default function OfficeCanvas({ agents, agentStatuses, messages, selectedAgent, onSelectAgent }) {
+  const containerRef = useRef(null);
+  const managerRef   = useRef(null);
+  const spawnedRef   = useRef(new Set());
+  const callbacksRef = useRef({});   // mutable ref so SceneManager never has stale closures
+
+  const [loaded,          setLoaded]          = useState(false);
+  const [screenPositions, setScreenPositions] = useState({});
+  const [hoveredId,       setHoveredId]       = useState(null);
+
+  // Keep callbacks ref fresh every render
+  callbacksRef.current = {
+    onSelectAgent,
+    onHoverAgent:           setHoveredId,
+    onScreenPositionsUpdate: setScreenPositions,
+  };
+
+  // ── Mount scene once ──────────────────────────────────────────
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const mgr = new SceneManager(containerRef.current, {
+      onSelectAgent:           (id) => callbacksRef.current.onSelectAgent(id),
+      onHoverAgent:            (id) => callbacksRef.current.onHoverAgent(id),
+      onScreenPositionsUpdate: (p)  => callbacksRef.current.onScreenPositionsUpdate(p),
+      onLoaded:                ()   => setLoaded(true),
+    });
+    managerRef.current = mgr;
+
+    return () => {
+      mgr.dispose();
+      managerRef.current = null;
+      spawnedRef.current = new Set();
+      setLoaded(false);
+    };
+  }, []); // run once
+
+  // ── Sync agents into 3D scene ─────────────────────────────────
+  useEffect(() => {
+    const mgr = managerRef.current;
+    if (!mgr || !loaded) return;
+
+    const currentIds = new Set(agents.map(a => a.id));
+
+    // Spawn new agents
+    agents.forEach((agent, idx) => {
+      if (!spawnedRef.current.has(agent.id)) {
+        mgr.addAgent(agent.id, agent.color, idx);
+        spawnedRef.current.add(agent.id);
+      }
+    });
+
+    // Remove deleted agents
+    for (const id of [...spawnedRef.current]) {
+      if (!currentIds.has(id)) {
+        mgr.removeAgent(id);
+        spawnedRef.current.delete(id);
+      }
+    }
+  }, [agents, loaded]);
+
+  // ── Sync statuses → animations ───────────────────────────────
+  useEffect(() => {
+    const mgr = managerRef.current;
+    if (!mgr || !loaded) return;
+    for (const [id, st] of Object.entries(agentStatuses)) {
+      mgr.setAgentStatus(id, st.status || 'idle');
+    }
+  }, [agentStatuses, loaded]);
+
+  // ── Camera follow selected agent ─────────────────────────────
+  useEffect(() => {
+    const mgr = managerRef.current;
+    if (!mgr) return;
+    if (selectedAgent) mgr.focusAgent(selectedAgent.id);
+    else               mgr.clearFocus();
+  }, [selectedAgent]);
+
+  return (
+    <div className="office-3d-wrap" ref={containerRef}>
+      {!loaded && (
+        <div className="office-loading">
+          <div className="loading-spinner" />
+          <span>LOADING OFFICE</span>
         </div>
+      )}
 
-        {/* Connection lines between talking agents */}
-        <svg className="connections-svg">
-          {connections.map(({ from, to, msg }, i) => {
-            const fx = from.desk_x + 56, fy = from.desk_y + 40;
-            const tx = to.desk_x   + 56, ty = to.desk_y   + 40;
-            const mx = (fx + tx) / 2,    my = (fy + ty) / 2;
-            return (
-              <g key={i}>
-                <line
-                  x1={fx} y1={fy} x2={tx} y2={ty}
-                  stroke={from.color || '#4f8ef7'}
-                  strokeWidth="1.5"
-                  strokeDasharray="6,4"
-                  opacity="0.5"
-                />
-                <circle cx={mx} cy={my} r="4" fill={from.color || '#4f8ef7'} opacity="0.7"/>
-              </g>
-            );
-          })}
-        </svg>
-
-        {/* Agent desks */}
+      {/* Screen-space React overlay */}
+      <div className="overlay-layer" style={{ pointerEvents: 'none' }}>
         {agents.map(agent => (
-          <AgentDesk
+          <AgentBubble
             key={agent.id}
             agent={agent}
-            status={agentStatuses[agent.id] || {}}
+            pos={screenPositions[agent.id]}
+            status={agentStatuses[agent.id]}
             selected={selectedAgent?.id === agent.id}
-            onClick={onSelectAgent}
-            onDragEnd={(id, x, y) => onMoveAgent(id, x, y)}
+            hovered={hoveredId === agent.id}
           />
         ))}
       </div>
 
-      {/* Pan hint */}
-      <div className="canvas-hint">Alt+drag to pan · Click agent to interact</div>
+      <div className="canvas-hint">Drag to orbit · Scroll to zoom · Click agent to select</div>
     </div>
   );
 }

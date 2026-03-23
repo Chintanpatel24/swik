@@ -8,8 +8,15 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': { target: 'http://localhost:7842', changeOrigin: true },
-      '/ws':  { target: 'ws://localhost:7842', ws: true }
     }
   },
-  build: { outDir: 'dist', emptyOutDir: true }
+  build: { outDir: 'dist', emptyOutDir: true },
+  optimizeDeps: {
+    exclude: ['three/addons']
+  },
+  resolve: {
+    alias: {
+      // allow "three/addons/..." imports in node_modules to resolve correctly
+    }
+  }
 });

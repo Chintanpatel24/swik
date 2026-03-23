@@ -1,16 +1,15 @@
 {
   "name": "agent-office",
   "version": "1.0.0",
-  "description": "A visual multi-agent AI office that runs from USB — 100% local, free, open source",
+  "description": "Visual multi-agent AI office — local, free, open source",
   "main": "electron/main.js",
   "type": "commonjs",
   "scripts": {
-    "dev":        "concurrently \"npm run backend\" \"npm run vite\" \"wait-on http://localhost:5174 && electron .\"",
-    "vite":       "vite --port 5174",
-    "backend":    "node backend/src/server.js",
-    "build":      "vite build && electron-builder",
-    "start":      "electron .",
-    "portable":   "electron-builder --linux AppImage"
+    "dev":      "concurrently \"npm run backend\" \"npm run vite\" \"wait-on http://localhost:5174 && electron .\"",
+    "vite":     "vite --port 5174",
+    "backend":  "node backend/src/server.js",
+    "build":    "vite build && electron-builder",
+    "portable": "electron-builder --linux AppImage"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.3",
@@ -18,7 +17,9 @@
     "express":        "^4.18.3",
     "node-cron":      "^3.0.3",
     "ws":             "^8.16.0",
-    "uuid":           "^9.0.0"
+    "uuid":           "^9.0.0",
+    "three":          "^0.163.0",
+    "zustand":        "^4.5.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
@@ -31,15 +32,9 @@
     "wait-on":              "^7.2.0"
   },
   "build": {
-    "appId":       "com.agentoffice.app",
+    "appId": "com.agentoffice.app",
     "productName": "AgentOffice",
-    "linux": {
-      "target": ["AppImage", "deb"],
-      "category": "Utility"
-    },
-    "portable": {
-      "artifactName": "AgentOffice-portable.AppImage"
-    },
+    "linux": { "target": ["AppImage", "deb"] },
     "files": ["electron/**/*", "backend/**/*", "dist/**/*"],
     "extraResources": [{ "from": "backend", "to": "backend" }]
   }
