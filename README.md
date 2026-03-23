@@ -272,8 +272,3 @@ PRs welcome! Ideas for contributions:
 - Export task results as PDF/Markdown
 
 ---
-
-<div align="center">
-Made with ❤️ by <a href="https://github.com/Chintanpatel24">Chintan Patel</a> · 
-<a href="https://github.com/Chintanpatel24/swik">github.com/Chintanpatel24/swik</a>
-</div>
