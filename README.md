@@ -128,22 +128,6 @@ cp dist/SWIK-*.AppImage /path/to/usb/
 
 ---
 
-## AI Providers
-
-Each agent can use a **different** AI provider and model. Mix and match freely.
-
-| Provider | Type | Cost | Setup |
-|----------|------|------|-------|
-| **Ollama** | Local | **Free** | `ollama serve && ollama pull llama3.2` |
-| **LM Studio** | Local | **Free** | Enable local server on port 1234 |
-| **Groq** | Cloud | **Free tier** | [console.groq.com](https://console.groq.com) |
-| **OpenAI** | Cloud | Paid | [platform.openai.com](https://platform.openai.com) |
-| **Together AI** | Cloud | Paid/Free tier | [together.ai](https://together.ai) |
-| **llama.cpp** | Local | **Free** | Run with `--server` flag |
-| **Any OpenAI-compat** | Any | Varies | Set base URL + key |
-
----
-
 ## Building Layout
 
 ```
