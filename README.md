@@ -1,197 +1,197 @@
-# 🤖 Swik Agent
+# ⬡ AgentOffice
 
-A **24/7 self-running tech intelligence agent** — 100% free, no paid APIs, no accounts.
+A visual multi-agent AI office that runs as a **Linux desktop app** (Electron).  
+Plug in a USB, open it, and your whole team of AI agents is ready to work — **no internet, no cloud, no API keys required**.
 
-Scrapes Hacker News, GitHub Trending, Dev.to, and Reddit every 30 minutes, then uses a **local Ollama AI** to generate personalised digests saved to a private summary window. Streams live to a React dashboard over WebSocket. Persists everything in SQLite.
+---
+
+## What it is
+
+AgentOffice is an open-source desktop application where you create a team of AI agents, give each one a name, role, skills, and a local AI model, then watch them collaborate on tasks in a visual office environment. Agents sit at desks, communicate with each other, use tools like web search and a sandboxed file system, and produce real output.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ⬡ AGENTOFFICE                              12:34:56  ─  □  ✕  │
+├──────────┬───────────────────────────────────────┬──────────────┤
+│  TEAM    │                                       │ 💬 CHAT      │
+│          │   ╔══════╗      ╔══════╗              │              │
+│  BOSS    │   ║ Rex  ║      ║ Nova ║              │  Messages    │
+│  ● Rex   │   ║ boss ║──────║ dev  ║              │  stream here │
+│          │   ╚══════╝      ╚══════╝              │              │
+│  DEV     │                                       │ ⚡ TASKS     │
+│  ● Nova  │   ╔══════╗      ╔══════╗              │              │
+│          │   ║Pixel ║      ║Scout ║              │  Task list   │
+│  DESIGN  │   ║design║      ║ res  ║              │  + results   │
+│  ● Pixel │   ╚══════╝      ╚══════╝              │              │
+│          │                                       │              │
+│ + NEW    │  Alt+drag to pan · Click to select    │              │
+└──────────┴───────────────────────────────────────┴──────────────┘
+```
 
 ---
 
 ## Features
 
-- **Zero cost** — Ollama runs the LLM locally; all data sources are free public APIs
-- **Personalised** — set your interests (Rust, AI, DevOps…) and every digest is tailored to them
-- **24/7 agent loop** — node-cron scheduler, auto-restarts via Docker
-- **Real-time dashboard** — live activity log + private summary window over WebSocket
-- **Persistent** — SQLite stores all digests, logs, interests, and settings across restarts
-- **Configurable** — scan interval, model choice, timezone — all via UI or env vars
-- **Docker-ready** — one command brings up Ollama + backend + frontend
+- **Visual office** — agents sit at draggable desks, connection lines appear when they communicate
+- **Named agents** — give any agent a name, role, avatar, and custom colour
+- **Role system** — Boss (orchestrates), Developer, Designer, Researcher, Writer, or any custom role
+- **Skill assignment** — each agent has a skills list the AI uses to stay in-character
+- **Multi-model** — each agent can use a different AI: Ollama (local/free), LM Studio, Groq, OpenAI, or any OpenAI-compatible API
+- **Tool use** — agents can search the web (DuckDuckGo, free) and read/write files
+- **Isolated workspace** — each agent gets a sandboxed folder; they cannot touch your system files
+- **Boss orchestration** — give a task to the team; Boss breaks it down, delegates to the right agents, synthesises results
+- **Direct chat** — talk to any agent one-on-one
+- **USB portable** — place a `.agentoffice-portable` file next to the AppImage; all data stays on the USB
+
+---
+
+## Quickstart
+
+### 1. Install Ollama (free local AI)
+
+```bash
+# Linux
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve &
+ollama pull llama3.2          # 2 GB — recommended
+```
+
+### 2. Install & run
+
+```bash
+# Clone / unzip
+cd agentoffice
+npm install
+
+# Development mode (Electron + Vite + backend all start together)
+npm run dev
+```
+
+### 3. Build portable AppImage (USB mode)
+
+```bash
+npm run portable
+# → dist/AgentOffice-portable.AppImage
+
+# To use USB mode: copy to USB, then:
+touch /path/to/usb/.agentoffice-portable
+# All data (agents, tasks, workspaces) stays on the USB
+```
+
+---
+
+## Adding agents
+
+Click **+ NEW AGENT** in the sidebar or hit the **+** button in the office.
+
+| Field | Description |
+|-------|-------------|
+| Name | What the agent is called (e.g. "Zara", "Dev-01") |
+| Role | boss / developer / designer / researcher / writer / custom |
+| Avatar | Visual character style |
+| Colour | Desk accent colour |
+| AI Provider | Ollama · LM Studio · Groq · OpenAI · Any compatible |
+| API URL | Where the AI runs (default: http://localhost:11434 for Ollama) |
+| API Key | Leave blank for Ollama/LM Studio; required for Groq/OpenAI |
+| Model | llama3.2, gpt-4o, mixtral, phi3, etc. |
+| System Prompt | The agent's personality, expertise, and instructions |
+| Skills | Comma-separated skills shown to the AI and in the UI |
+
+---
+
+## Dispatching tasks
+
+1. Click **⚡ NEW TASK** in the chat panel
+2. Write a title and detailed description
+3. Click **DISPATCH TO TEAM**
+
+The Boss agent:
+1. Analyses the task
+2. Breaks it into subtasks
+3. Assigns each subtask to the best-suited agent
+4. Each agent works (with tool use if needed)
+5. Boss synthesises all results into a final summary
+
+---
+
+## Agent tools
+
+| Tool | Description | Free? |
+|------|-------------|-------|
+| `web_search` | DuckDuckGo search | ✓ |
+| `file_write` | Write files to agent's workspace | ✓ |
+| `file_read` | Read files from agent's workspace | ✓ |
+| `file_list` | List files in workspace | ✓ |
+
+Agents call tools automatically when needed. Workspace files are stored in:
+- **Normal mode**: `~/.config/agentoffice/agentoffice-data/workspaces/`
+- **USB mode**: `<usb>/agentoffice-data/workspaces/`
 
 ---
 
 ## Architecture
 
 ```
-techscan-agent/
-├── docker-compose.yml          ← Full stack: Ollama + backend + frontend
-├── .env.example                ← Environment variable reference
-├── start.sh                    ← Dev mode launcher (no Docker needed)
+agentoffice/
+├── electron/
+│   ├── main.js          ← Electron shell, window, IPC, USB detection
+│   └── preload.js       ← Secure bridge to renderer
 │
-├── backend/
-│   ├── Dockerfile
-│   ├── package.json            ← Zero paid dependencies
-│   └── src/
-│       ├── server.js           ← Express + WebSocket server
-│       ├── agent.js            ← Core 24/7 agent loop + cron scheduler
-│       ├── ai.js               ← Ollama integration (local free AI)
-│       ├── db.js               ← SQLite: summaries, interests, settings, logs
-│       ├── config.js           ← Central config from env vars
-│       └── sources/
-│           ├── hackernews.js   ← HN Firebase API
-│           ├── github.js       ← GitHub Search API (trending repos)
-│           ├── devto.js        ← Dev.to public API
-│           └── reddit.js       ← Reddit JSON API
+├── backend/src/
+│   ├── server.js        ← Express + WebSocket, all REST endpoints
+│   ├── db.js            ← SQLite: agents, tasks, messages, workspaces
+│   ├── agents/
+│   │   ├── orchestrator.js   ← Boss agent task coordination
+│   │   ├── agentExecutor.js  ← Single agent runs task with tools
+│   │   └── aiRunner.js       ← Ollama + OpenAI-compat AI calls
+│   └── tools/
+│       ├── webSearch.js      ← DuckDuckGo (free, no key)
+│       └── fileSystem.js     ← Sandboxed per-agent workspace
 │
-└── frontend/
-    ├── Dockerfile
-    ├── nginx.conf              ← Proxies /api and /ws to backend
-    └── src/
-        ├── App.jsx / App.css
-        ├── components/
-        │   ├── Header.jsx          ← Status bar, controls, model pill
-        │   ├── OllamaStatus.jsx    ← Live Ollama health indicator
-        │   ├── ActivityLog.jsx     ← Real-time agent log panel
-        │   ├── SummaryPanel.jsx    ← Digest list with interests bar
-        │   ├── SummaryCard.jsx     ← Collapsible digest (delete support)
-        │   ├── SettingsPanel.jsx   ← Interests + scan interval config
-        │   └── StatsPanel.jsx      ← KPIs, source breakdown, scan history
-        └── hooks/
-            ├── useAgentSocket.js   ← WebSocket state + all API calls
-            └── useCountdown.js     ← Next-scan countdown timer
+└── src/
+    ├── App.jsx               ← Root layout
+    ├── hooks/useOffice.js    ← WebSocket state + API calls
+    ├── components/
+    │   ├── Office/
+    │   │   ├── TitleBar.jsx       ← Frameless window controls
+    │   │   ├── Sidebar.jsx        ← Agent roster
+    │   │   └── OfficeCanvas.jsx   ← Visual desk layout + connections
+    │   ├── Agent/
+    │   │   └── AgentDesk.jsx      ← Individual agent desk + avatar SVGs
+    │   ├── Chat/
+    │   │   └── ChatPanel.jsx      ← Messages + task creation
+    │   ├── Task/
+    │   │   └── TaskPanel.jsx      ← Task list + results
+    │   └── Settings/
+    │       └── AgentEditor.jsx    ← Create/edit agent modal
+    └── styles/main.css            ← Full design system
 ```
 
 ---
 
-## Option A — Docker (recommended for 24/7)
+## Supported AI providers
 
-```bash
-# 1. Clone / unzip the project
-cd swik
-# 2. Copy env file (optional — defaults work fine)
-cp .env.example .env
-
-# 3. Start everything (Ollama + model pull + backend + frontend)
-docker compose up -d
-
-# 4. Watch logs
-docker compose logs -f backend
-
-# 5. Open the dashboard
-open http://localhost:5173
-```
-
-First run downloads the Ollama image and pulls the model (~2GB for llama3.2).  
-Subsequent starts are instant — model weights are cached in a Docker volume.
-
-**To stop:**
-```bash
-docker compose down
-```
-
-**To change model:**
-```bash
-# Edit .env
-OLLAMA_MODEL=mistral
-
-# Restart
-docker compose up -d
-```
+| Provider | Type | Cost | Setup |
+|----------|------|------|-------|
+| Ollama | Local | Free | `ollama serve && ollama pull llama3.2` |
+| LM Studio | Local | Free | Run LM Studio, enable local server |
+| Groq | Cloud | Free tier | Get key at console.groq.com |
+| OpenAI | Cloud | Paid | Get key at platform.openai.com |
+| llama.cpp | Local | Free | Run with `--server` flag |
+| Any OpenAI-compat | Any | Varies | Set URL + key |
 
 ---
 
-## Option B — Local dev (no Docker)
+## USB Portable Mode
 
-### Requirements
-- Node.js 18+
-- Ollama installed and running
-
-### 1. Install Ollama
-
-| Platform | Command |
-|----------|---------|
-| macOS    | `brew install ollama` |
-| Linux    | `curl -fsSL https://ollama.com/install.sh \| sh` |
-| Windows  | Download from ollama.com/download/windows |
-
-```bash
-ollama serve
-ollama pull llama3.2     # 2GB — recommended
-```
-
-### 2. Run
-
-```bash
-./start.sh
-# or manually:
-cd backend && npm install && npm start &
-cd frontend && npm install && npm run dev
-```
-
-Open **http://localhost:5173**
+1. Build: `npm run portable` → `AgentOffice-portable.AppImage`
+2. Copy AppImage to USB drive
+3. Create trigger file: `touch /mnt/usb/.agentoffice-portable`
+4. Run from USB — all data (SQLite DB, agent workspaces) stays on the USB
+5. Plug into any Linux machine and your agents are exactly where you left them
 
 ---
 
-## Configuration
+## Open Source
 
-### Environment variables
-
-| Variable                | Default                  | Description                   |
-|-------------------------|--------------------------|-------------------------------|
-| `OLLAMA_URL`            | http://localhost:11434   | Ollama API endpoint            |
-| `OLLAMA_MODEL`          | llama3.2                 | Model to use for summaries     |
-| `SCAN_INTERVAL_MINUTES` | 30                       | How often to scan              |
-| `TIMEZONE`              | Asia/Kolkata             | Timestamp timezone             |
-| `PORT`                  | 3001                     | Backend HTTP/WS port           |
-| `FRONTEND_URL`          | http://localhost:5173    | CORS origin for backend        |
-
-### In-app settings (via ⚙ button)
-
-- **Interests** — add/toggle/remove topics; AI personalises every digest around them
-- **Scan interval** — change frequency live without restarting
-
----
-
-## API Reference
-
-| Method | Path                  | Description                          |
-|--------|-----------------------|--------------------------------------|
-| GET    | /api/health           | Health check + uptime                |
-| GET    | /api/status           | Agent state (scanning, next scan…)   |
-| GET    | /api/ollama           | Ollama connectivity + model list     |
-| GET    | /api/summaries        | All saved digests                    |
-| DELETE | /api/summaries/:id    | Delete a digest                      |
-| GET    | /api/logs             | Activity log entries                 |
-| DELETE | /api/logs             | Clear all logs                       |
-| POST   | /api/scan             | Trigger a manual scan                |
-| GET    | /api/interests        | List all interests                   |
-| POST   | /api/interests        | Add an interest `{ topic }`          |
-| PATCH  | /api/interests/:id    | Toggle interest `{ enabled }`        |
-| DELETE | /api/interests/:id    | Remove an interest                   |
-| GET    | /api/settings         | All settings key/value               |
-| POST   | /api/settings         | Save setting `{ key, value }`        |
-| GET    | /api/stats            | Scan stats, source breakdown         |
-
----
-
-## Choosing a Model
-
-| Model      | Size  | Speed   | Quality  | Best for               |
-|------------|-------|---------|----------|------------------------|
-| llama3.2   | 2GB   | ★★★★★  | ★★★★☆   | Recommended default    |
-| phi3       | 1.7GB | ★★★★★  | ★★★☆☆   | Low RAM / fast machine |
-| mistral    | 4GB   | ★★★☆☆  | ★★★★★   | Best summary quality   |
-| gemma2     | 5GB   | ★★★☆☆  | ★★★★★   | Google's top model     |
-
----
-
-## Cost Breakdown
-
-| Component            | Cost    |
-|----------------------|---------|
-| Ollama + models      | Free    |
-| Hacker News API      | Free    |
-| GitHub API           | Free    |
-| Dev.to API           | Free    |
-| Reddit API           | Free    |
-| SQLite               | Free    |
-| Node.js / React      | Free    |
-| **Total**            | **$0**  |
+MIT License. Fork it, extend it, add more agents, more tools, more roles.
