@@ -1,16 +1,34 @@
 {
-  "name": "swik-pixel-swarm",
+  "name": "nexus-agent-platform",
   "version": "1.0.0",
+  "description": "NEXUS — Local AI Agent Platform. Create, connect and run AI agents with free LLMs.",
+  "license": "MIT",
+  "type": "commonjs",
   "scripts": {
-    "dev": "concurrently \"npm run backend\" \"npm run vite\"",
-    "start": "npm install && pip install -r requirements.txt && concurrently \"python backend/miro_swarm.py\" \"npm run vite\"",
-    "vite": "vite --port 5175",
-    "backend": "python backend/miro_swarm.py"
+    "start": "concurrently --names \"BACKEND,PYTHON,FRONTEND\" --prefix-colors \"cyan,magenta,yellow\" \"npm run backend\" \"npm run python\" \"npm run frontend\"",
+    "start:no-python": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,yellow\" \"npm run backend\" \"npm run frontend\"",
+    "backend": "node backend/server.js",
+    "python": "python agents/runner.py",
+    "frontend": "vite frontend --port 5173",
+    "build": "vite build frontend --outDir ../dist",
+    "setup": "npm install && pip install -r agents/requirements.txt",
+    "setup:py": "pip install -r agents/requirements.txt",
+    "dev": "npm run start"
   },
   "dependencies": {
-    "concurrently": "^8.2.2",
+    "better-sqlite3": "^9.4.3",
     "cors": "^2.8.5",
-    "ws": "^8.16.0",
-    "zustand": "^4.5.2"
+    "express": "^4.19.2",
+    "node-fetch": "^2.7.0",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "vite": "^5.2.0"
   }
 }
